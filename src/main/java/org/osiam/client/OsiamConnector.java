@@ -39,8 +39,17 @@ import org.osiam.client.oauth.Scope;
 import org.osiam.client.query.Query;
 import org.osiam.client.query.QueryBuilder;
 import org.osiam.client.user.BasicUser;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.SSLContext;
 import org.osiam.resources.scim.*;
 
+import javax.net.ssl.SSLContext;
 import javax.ws.rs.client.ClientBuilder;
 import java.net.URI;
 import java.util.List;
@@ -59,14 +68,48 @@ public class OsiamConnector {
     private static final int DEFAULT_MAX_CONNECTIONS = 40;
     private static final PoolingHttpClientConnectionManager connectionManager =
             new PoolingHttpClientConnectionManager();
+    private static ClientConfig clientConfig= null;
+    private static SSLContext sslcontext = null;
+    
+    static {
+    	
+    	clientConfig=new ClientConfig()
+                .property(ClientProperties.REQUEST_ENTITY_PROCESSING, RequestEntityProcessing.BUFFERED)
+                .property(ApacheClientProperties.CONNECTION_MANAGER, connectionManager)
+                .register(HttpAuthenticationFeature.basicBuilder().build())
+                .property(ClientProperties.CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT)
+                .property(ClientProperties.READ_TIMEOUT, DEFAULT_READ_TIMEOUT);
+		try {
+			sslcontext = SSLContext.getInstance("TLS");
+			sslcontext.init(null, new TrustManager[] { new X509TrustManager() {
+				public void checkClientTrusted(X509Certificate[] arg0, String arg1) {
+				}
 
-    private static final javax.ws.rs.client.Client client = ClientBuilder.newClient(new ClientConfig()
-            .connectorProvider(new ApacheConnectorProvider())
-            .property(ClientProperties.REQUEST_ENTITY_PROCESSING, RequestEntityProcessing.BUFFERED)
-            .property(ApacheClientProperties.CONNECTION_MANAGER, connectionManager)
-            .register(HttpAuthenticationFeature.basicBuilder().build())
-            .property(ClientProperties.CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT)
-            .property(ClientProperties.READ_TIMEOUT, DEFAULT_READ_TIMEOUT));
+				public void checkServerTrusted(X509Certificate[] arg0, String arg1) {
+				}
+
+				public X509Certificate[] getAcceptedIssuers() {
+					return new X509Certificate[0];
+				}
+
+				
+
+			} }, new java.security.SecureRandom());
+		} catch (NoSuchAlgorithmException | KeyManagementException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+    	
+    	
+    	
+    }
+
+    private static final javax.ws.rs.client.Client client = ClientBuilder.newBuilder()
+    		                                               .withConfig(clientConfig)
+    		                                               .hostnameVerifier(((s1, s2) -> true)).sslContext(sslcontext).build();
+    
+   
 
     static {
         setMaxConnections(DEFAULT_MAX_CONNECTIONS);
